@@ -1,5 +1,5 @@
 /**
- * ScriptVault - Premium Interactive Frontend & Script Collection Manager
+ * ScriptVault - Premium Interactive Frontend & Cloud Script Collection Manager
  */
 
 // Application State
@@ -7,6 +7,9 @@ const state = {
     scripts: [],
     searchQuery: ''
 };
+
+// ExtendsClass Shared Public JSON Bin Configuration
+const BIN_URL = 'https://extendsclass.com/api/json-storage/bin/dcbedfd';
 
 // DOM Cache
 const dom = {
@@ -51,7 +54,7 @@ function initApp() {
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
     dom.currentDateStr.textContent = new Date().toLocaleDateString('ru-RU', options);
     
-    // Fetch scripts from server
+    // Fetch scripts from ExtendsClass Cloud Storage
     fetchScripts();
     
     // Bind Event Listeners
@@ -90,17 +93,37 @@ function bindEvents() {
 }
 
 // ==========================================================================
-// API Handlers (async / await REST bridges)
+// Cloud API Handlers (async / await ExtendsClass Bin CRUD)
 // ==========================================================================
 
 async function fetchScripts() {
     try {
-        const response = await fetch('/api/scripts');
-        if (!response.ok) throw new Error('Не удалось загрузить скрипты');
-        state.scripts = await response.json();
+        const response = await fetch(BIN_URL);
+        if (!response.ok) throw new Error('Не удалось загрузить скрипты из облака');
+        const data = await response.json();
+        state.scripts = data.scripts || [];
         render();
     } catch (error) {
         showToast(error.message, 'error');
+    }
+}
+
+async function saveScripts(updatedScripts) {
+    try {
+        const response = await fetch(BIN_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scripts: updatedScripts })
+        });
+        
+        if (!response.ok) throw new Error('Не удалось сохранить изменения в облаке');
+        
+        state.scripts = updatedScripts;
+        render();
+        return true;
+    } catch (error) {
+        showToast(error.message, 'error');
+        return false;
     }
 }
 
@@ -110,71 +133,57 @@ async function handleAddScript(e) {
     const name = dom.scriptNameInput.value.trim();
     const content = dom.scriptContentInput.value;
     
-    try {
-        const response = await fetch('/api/scripts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, content })
-        });
-        
-        if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.error || 'Не удалось добавить скрипт');
-        }
-        
+    const newScript = {
+        id: Date.now(), // Generate unique numeric ID client-side
+        name,
+        content,
+        created_at: new Date().toISOString()
+    };
+    
+    // Add to the beginning of the list
+    const updatedScripts = [newScript, ...state.scripts];
+    
+    const success = await saveScripts(updatedScripts);
+    if (success) {
         // Reset Inputs
         dom.scriptForm.reset();
-        showToast('Скрипт успешно добавлен', 'success');
-        
-        // Re-fetch database items
-        await fetchScripts();
-    } catch (error) {
-        showToast(error.message, 'error');
+        showToast('Скрипт успешно добавлен в облачное хранилище', 'success');
     }
 }
 
 async function handleUpdateScript(e) {
     e.preventDefault();
     
-    const id = dom.editScriptId.value;
+    const id = parseInt(dom.editScriptId.value);
     const name = dom.editScriptName.value.trim();
     const content = dom.editScriptContent.value;
     
-    try {
-        const response = await fetch(`/api/scripts/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, content })
-        });
-        
-        if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.error || 'Не удалось обновить скрипт');
+    const updatedScripts = state.scripts.map(s => {
+        if (s.id === id) {
+            return { ...s, name, content };
         }
-        
+        return s;
+    });
+    
+    const success = await saveScripts(updatedScripts);
+    if (success) {
         closeModal();
-        showToast('Скрипт сохранен', 'success');
-        await fetchScripts();
-    } catch (error) {
-        showToast(error.message, 'error');
+        showToast('Скрипт сохранен в облаке', 'success');
     }
 }
 
 async function handleDeleteScript() {
-    const id = dom.editScriptId.value;
+    const id = parseInt(dom.editScriptId.value);
     if (!confirm('Вы уверены, что хотите окончательно удалить этот скрипт?')) {
         return;
     }
     
-    try {
-        const response = await fetch(`/api/scripts/${id}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error('Не удалось удалить скрипт');
-        
+    const updatedScripts = state.scripts.filter(s => s.id !== id);
+    
+    const success = await saveScripts(updatedScripts);
+    if (success) {
         closeModal();
-        showToast('Скрипт удален', 'info');
-        await fetchScripts();
-    } catch (error) {
-        showToast(error.message, 'error');
+        showToast('Скрипт удален из облака', 'info');
     }
 }
 

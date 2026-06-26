@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScriptVault // Premium Script Collection</title>
+    
+    <!-- Google Fonts: Outfit & Fira Code (for code blocks) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for modern premium icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <!-- Premium background glow elements -->
+    <div class="glow-bg-element element-1"></div>
+    <div class="glow-bg-element element-2"></div>
+    <div class="glow-bg-element element-3"></div>
+
+    <div class="app-container">
+        <!-- Header Panel -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-code fa-beat-fade" style="--fa-animation-duration: 5s;"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>ScriptVault</h1>
+                    <span>Коллекция Ваших Скриптов</span>
+                </div>
+            </div>
+            
+            <!-- Quick search -->
+            <div class="search-bar-container">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="script-search" placeholder="Поиск скриптов по названию..." autocomplete="off">
+                <button id="clear-search-btn" class="clear-search-btn" style="display: none;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="app-main">
+            <!-- Left Side: Add Script Form & Stats -->
+            <section class="control-panel">
+                <!-- Stats Showcase Card -->
+                <div class="glass-card stats-card">
+                    <div class="stats-header">
+                        <h3>Панель управления</h3>
+                        <span id="current-date-str">Загрузка...</span>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-box-full">
+                            <span class="stat-num" id="stat-count">0</span>
+                            <span class="stat-lbl">Всего Скриптов в сейфе</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Script Form -->
+                <div class="glass-card form-card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-square-plus header-glow-icon"></i> Новый Скрипт</h3>
+                    </div>
+                    <form id="script-form">
+                        <div class="form-group">
+                            <label for="script-name-input">Имя скрипта</label>
+                            <div class="input-wrapper">
+                                <input type="text" id="script-name-input" placeholder="Например, Deploy to Production" required autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="script-content-input">Скрипт</label>
+                            <div class="textarea-wrapper">
+                                <textarea id="script-content-input" placeholder="Вставьте код или скрипт сюда..." required rows="8" spellcheck="false"></textarea>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="submit-btn" id="add-script-btn">
+                            <span>Добавить Скрипт</span>
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Right Side: Scripts Grid -->
+            <section class="scripts-board">
+                <!-- Board Header -->
+                <div class="board-header glass-card">
+                    <div class="board-title">
+                        <i class="fa-solid fa-cubes"></i>
+                        <h4>Ваши скрипты</h4>
+                    </div>
+                    <span class="badge" id="badge-total">0</span>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state-card glass-card" id="empty-state" style="display: none;">
+                    <div class="empty-icon">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </div>
+                    <h4>Сейф пуст</h4>
+                    <p>Добавьте свой первый скрипт, используя форму слева, чтобы он появился здесь.</p>
+                </div>
+
+                <!-- Scripts Grid Container -->
+                <div class="scripts-grid" id="scripts-grid-container">
+                    <!-- Dynamic cards loaded here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Script Details / Edit Modal -->
+    <div class="modal-overlay" id="details-modal" style="display: none;">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen-to-square"></i> Детали Скрипта</h3>
+                <button class="close-modal-btn" id="close-modal-btn">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="edit-script-form">
+                <input type="hidden" id="edit-script-id">
+                
+                <div class="form-group">
+                    <label for="edit-script-name">Имя скрипта</label>
+                    <div class="input-wrapper">
+                        <input type="text" id="edit-script-name" required autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-script-content">Скрипт</label>
+                    <div class="textarea-wrapper">
+                        <textarea id="edit-script-content" required rows="12" spellcheck="false"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-danger" id="delete-script-btn">
+                        <i class="fa-solid fa-trash-can"></i> Удалить
+                    </button>
+                    <div class="footer-actions">
+                        <button type="button" class="btn-secondary" id="cancel-edit-btn">Отмена</button>
+                        <button type="submit" class="btn-primary">Сохранить</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom App Script -->
+    <script src="static/js/app.js"></script>
+</body>
+</html>
