@@ -9,8 +9,7 @@ const state = {
 };
 
 // ExtendsClass Shared Public JSON Bin Configuration
-const BIN_URL = 'https://extendsclass.com/api/json-storage/bin/dcbedfd';
-
+const BIN_URL = 'https://json.extendsclass.com/bin/f8b6bd12efbe';
 // DOM Cache
 const dom = {
     scriptForm: document.getElementById('script-form'),
@@ -99,6 +98,7 @@ function bindEvents() {
 async function fetchScripts() {
     try {
         const response = await fetch(BIN_URL);
+
         if (!response.ok) throw new Error('Не удалось загрузить скрипты из облака');
         const data = await response.json();
         state.scripts = data.scripts || [];
@@ -111,8 +111,8 @@ async function fetchScripts() {
 async function saveScripts(updatedScripts) {
     try {
         const response = await fetch(BIN_URL, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/merge-patch+json', 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' },
             body: JSON.stringify({ scripts: updatedScripts })
         });
         
