@@ -56,6 +56,10 @@ body {
     position: relative;
 }
 
+a {
+    text-decoration: none;
+}
+
 /* Ambient Backdrop Glows */
 .glow-bg-element {
     position: fixed;
@@ -298,16 +302,15 @@ body {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.03);
     border-radius: var(--radius-md);
-    padding: 1.25rem;
+    padding: 10px;
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
     text-align: center;
 }
 
 .stat-num {
-    font-size: 2.2rem;
+    font-size: 23px;
     font-weight: 800;
     background: linear-gradient(135deg, #fff, var(--clr-cyan));
     -webkit-background-clip: text;
@@ -316,7 +319,7 @@ body {
 }
 
 .stat-lbl {
-    font-size: 0.75rem;
+    font-size: 11px;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -391,6 +394,11 @@ body {
     border-color: var(--glass-border-focus);
     box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
     background: rgba(0, 0, 0, 0.5);
+}
+
+.external-link {
+    margin-top: .8rem;
+    display: flex;
 }
 
 .submit-btn {

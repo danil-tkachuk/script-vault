@@ -8,8 +8,6 @@ const state = {
     searchQuery: ''
 };
 
-// ExtendsClass Shared Public JSON Bin Configuration
-const BIN_URL = 'https://json.extendsclass.com/bin/f8b6bd12efbe';
 // DOM Cache
 const dom = {
     scriptForm: document.getElementById('script-form'),
@@ -385,8 +383,8 @@ function showGeneratedResult(scriptText, presetTitle) {
                 result.querySelector('#save-generated').addEventListener('click', async () => {
                         const txt = document.getElementById('generated-script-text').value;
                         const name = presetTitle || 'Generated preset ' + Date.now();
-                        const newScript = { id: Date.now(), name, content: txt, created_at: new Date().toISOString() };
-                        const success = await saveScripts([newScript, ...state.scripts]);
+                        const newScript = { name, content: txt, created_at: new Date().toISOString() };
+                        const success = await addScripts(newScript);
                         if (success) {
                             showToast('Скрипт сохранен в облако', 'success');
                             result.style.display = 'none';
@@ -458,28 +456,49 @@ function bindEvents() {
 
 async function fetchScripts() {
     try {
-        const response = await fetch(BIN_URL);
+        const binIds = await fetch('https://json.extendsclass.com/bins', { 
+            method: 'GET',
+            headers: { 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' },
+            cache: 'no-store'
+        });
 
-        if (!response.ok) throw new Error('Не удалось загрузить скрипты из облака');
-        const data = await response.json();
-        state.scripts = data.scripts || [];
-        render();
+        const binIdsData = await binIds.json();
+        console.log('Fetched bin IDs:', binIdsData);
+
+        const scripts = [];
+
+        if (binIdsData && Array.isArray(binIdsData) && binIdsData.length > 0) {
+            await Promise.all(binIdsData.map(async (bin) => {
+                const script = await fetch(`https://json.extendsclass.com/bin/${bin}`, {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+                const scriptData = await script.json();
+                scriptData.id = bin; // Assign the bin ID to the script data
+                scripts.push(scriptData);
+            }));
+
+            console.log(scripts, '= scripts =');
+            state.scripts = scripts || [];
+            render();
+        }
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
-async function saveScripts(updatedScripts) {
+async function addScripts(newScript) {
     try {
-        const response = await fetch(BIN_URL, {
-            method: 'PATCH',
+        const response = await fetch('https://json.extendsclass.com/bin', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/merge-patch+json', 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' },
-            body: JSON.stringify({ scripts: updatedScripts })
+            body: JSON.stringify(newScript)
         });
         
         if (!response.ok) throw new Error('Не удалось сохранить изменения в облаке');
-        
-        state.scripts = updatedScripts;
+        const responseData = await response.json();
+        newScript.id = responseData.id;
+        state.scripts.unshift(newScript);
         render();
         return true;
     } catch (error) {
@@ -495,16 +514,12 @@ async function handleAddScript(e) {
     const content = dom.scriptContentInput.value;
     
     const newScript = {
-        id: Date.now(), // Generate unique numeric ID client-side
         name,
         content,
         created_at: new Date().toISOString()
     };
     
-    // Add to the beginning of the list
-    const updatedScripts = [newScript, ...state.scripts];
-    
-    const success = await saveScripts(updatedScripts);
+    const success = await addScripts(newScript);
     if (success) {
         // Reset Inputs
         dom.scriptForm.reset();
@@ -515,34 +530,50 @@ async function handleAddScript(e) {
 async function handleUpdateScript(e) {
     e.preventDefault();
     
-    const id = parseInt(dom.editScriptId.value);
+    const id = dom.editScriptId.value;
     const name = dom.editScriptName.value.trim();
     const content = dom.editScriptContent.value;
     
-    const updatedScripts = state.scripts.map(s => {
-        if (s.id === id) {
-            return { ...s, name, content };
-        }
-        return s;
-    });
+    const updatedScript = {
+        name,
+        content,
+        updated_at: new Date().toISOString(),
+        id
+    };
+
     
-    const success = await saveScripts(updatedScripts);
-    if (success) {
+    const updateScriptResult = await fetch(`https://json.extendsclass.com/bin/${id}`, {
+        method: 'PUT',
+        headers: { 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' },
+        body: JSON.stringify(updatedScript)
+    });
+
+
+    if (updateScriptResult) {
+        state.scripts = state.scripts.filter(s => s.id !== id);
+        state.scripts.unshift(updatedScript);
+        render();
         closeModal();
         showToast('Скрипт сохранен в облаке', 'success');
     }
 }
 
 async function handleDeleteScript() {
-    const id = parseInt(dom.editScriptId.value);
+    const id = dom.editScriptId.value
+
     if (!confirm('Вы уверены, что хотите окончательно удалить этот скрипт?')) {
         return;
     }
+
+    const deleteScript = await fetch(`https://json.extendsclass.com/bin/${id}`, {
+        method: 'DELETE',
+        headers: { 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' }
+    });
     
-    const updatedScripts = state.scripts.filter(s => s.id !== id);
-    
-    const success = await saveScripts(updatedScripts);
-    if (success) {
+    state.scripts = state.scripts.filter(s => s.id !== id);
+    render();
+
+    if (deleteScript.ok) {
         closeModal();
         showToast('Скрипт удален из облака', 'info');
     }
@@ -575,6 +606,7 @@ async function copyToClipboard(text) {
 // ==========================================================================
 
 function render() {
+    console.log(state, '= state =');
     let filtered = [...state.scripts];
     
     // Search Query Matching
@@ -660,6 +692,7 @@ function escapeHTML(str) {
 // ==========================================================================
 
 function openDetailsModal(script) {
+    console.log(script, '= openDetailsModal script =');
     dom.editScriptId.value = script.id;
     dom.editScriptName.value = script.name;
     dom.editScriptContent.value = script.content;

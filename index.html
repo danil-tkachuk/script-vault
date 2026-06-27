@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ScriptVault // Premium Script Collection</title>
+    <title>Script Vault</title>
     
     <!-- Google Fonts: Outfit & Fira Code (for code blocks) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,12 +26,8 @@
         <!-- Header Panel -->
         <header class="app-header">
             <div class="brand">
-                <div class="brand-icon">
-                    <i class="fa-solid fa-code fa-beat-fade" style="--fa-animation-duration: 5s;"></i>
-                </div>
                 <div class="brand-text">
-                    <h1>ScriptVault</h1>
-                    <span>Коллекция Ваших Скриптов</span>
+                    <h1>Script Vault</h1>
                 </div>
                 <div class="generate-script-btn" id="generate-script-btn">
                     <div>⚡ Сгенерировать скрипт <b>Гео Пресет</b></div>
@@ -60,9 +56,19 @@
                     </div>
                     <div class="stats-grid">
                         <div class="stat-box-full">
-                            <span class="stat-num" id="stat-count">0</span>
                             <span class="stat-lbl">Всего Скриптов в сейфе</span>
+                            <span class="stat-num" id="stat-count">0</span>
                         </div>
+                    </div>
+                    <div class="external-link">
+                        <a 
+                            href="https://danil-tkachuk.github.io/domain-checker" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            class="details-btn"
+                        >
+                            Domain Checker
+                        </a>
                     </div>
                 </div>
 
@@ -75,7 +81,7 @@
                         <div class="form-group">
                             <label for="script-name-input">Имя скрипта</label>
                             <div class="input-wrapper">
-                                <input type="text" id="script-name-input" placeholder="Например, Deploy to Production" required autocomplete="off">
+                                <input type="text" id="script-name-input" placeholder="Например: BG Parazit" required autocomplete="off">
                             </div>
                         </div>
 
