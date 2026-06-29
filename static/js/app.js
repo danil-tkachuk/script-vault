@@ -89,6 +89,45 @@ function createGenerateModal() {
             </form>
         </div>`;
 
+        document.addEventListener('paste', function (e) {
+        const target = e.target;
+
+        // Проверяем, что вставка происходит в textarea внутри блока .section
+        if (target.tagName === 'TEXTAREA' && target.closest('.section')) {
+            const section = target.closest('.section');
+                const textareas = Array.from(section.querySelectorAll('textarea'));
+
+                // Проверяем, что это именно ПЕРВЫЙ textarea в этой секции (индекс 0)
+                if (target === textareas[0]) {
+                    // Получаем текст из буфера обмена
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    
+                    // Разбиваем текст по переносам строк, убираем лишние пробелы по краям
+                    // .filter(line => line.trim() !== '') удалит пустые строки (актуально при копировании из ChatGPT/Notion)
+                    const lines = pastedText.split(/\r?\n/)
+                                            .map(line => line.trim())
+                                            .filter(line => line.length > 0);
+
+                    // Если вставили многострочный текст (больше одной строки)
+                    if (lines.length > 1) {
+                        // Отменяем стандартное поведение браузера (чтобы весь кусок текста не упал в первое поле)
+                        e.preventDefault();
+
+                        // Распределяем строки по textarea в текущей секции
+                        lines.forEach((line, index) => {
+                            if (textareas[index]) {
+                                textareas[index].value = line;
+                                
+                                // Важно: вызываем событие 'input' вручную.
+                                // Это нужно, если у вас привязаны счетчики символов (data-min/data-max) или валидация.
+                                textareas[index].dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        });
+                    }
+                }
+            }
+        });
+
         // basic styles so modal is usable (keeps consistent look with existing app)
         const style = document.createElement('style');
         style.textContent = `
