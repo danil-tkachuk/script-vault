@@ -67,6 +67,14 @@ function createGenerateModal() {
                     <input name="presetTitle" required placeholder="Страна / Оффер (например:  BG Parazit)" />
                 </div>
 
+                <div class="form-row" style="margin-bottom: 15px;">
+                    <label>Тип объявления</label>
+                    <select name="adType" style="width: 100%; box-sizing: border-box; padding: 11px 16px; margin-top: 6px; border-radius: 12px; background: rgba(0, 0, 0, 0.35); outline: none; border: 1px solid rgba(255, 255, 255, 0.08); color: #fff; font-size: 13px; font-weight: 600;">
+                        <option value="video">Видео (с Long Headlines)</option>
+                        <option value="static">Статика (без Long Headlines)</option>
+                    </select>
+                </div>
+
                 <div class="section" data-section="headlines">
                     <h4>Headlines <span>(от 5 до 40 символов)</span></h4>
                     ${new Array(5).fill(0).map((_,i)=> `<textarea name="h${i}" data-min="5" data-max="40" placeholder="Headline ${i+1}" ${i===0? 'required': ''}></textarea>`).join('')}
@@ -138,7 +146,7 @@ function createGenerateModal() {
             .modal-close{background:transparent;border:0;font-size:35px;cursor:pointer;color: #fff;padding: 0 5px;font-weight: 500;}
             .generate-form .form-row{margin-bottom:12px}
             .form-row label {font-weight: 700;font-size: 16px;color: #bfc5ce;}
-            .generate-form input, .generate-form textarea{width:100%;box-sizing:border-box;padding:11px 16px;margin-top:6px;border-radius:12px;background: rgba(0, 0, 0, 0.35);outline: none;border: 1px solid rgba(255, 255, 255, 0.08);color: #fff;font-size: 13px;font-weight: 600;}
+            .generate-form input, .generate-form textarea, .generate-form select{width:100%;box-sizing:border-box;padding:11px 16px;margin-top:6px;border-radius:12px;background: rgba(0, 0, 0, 0.35);outline: none;border: 1px solid rgba(255, 255, 255, 0.08);color: #fff;font-size: 13px;font-weight: 600;}
             .generate-form input::placeholder, .generate-form textarea::placeholder{color: #aaa}
             .generate-form textarea{min-height:48px;margin-bottom:6px;resize:vertical}
             .section{margin-bottom:14px}
@@ -156,12 +164,24 @@ function createGenerateModal() {
         modal.querySelector('.modal-close').addEventListener('click', closeGenerateModal);
         modal.querySelector('.modal-cancel').addEventListener('click', closeGenerateModal);
 
+        const adTypeSelect = modal.querySelector('[name="adType"]');
+        const longHeadlinesSection = modal.querySelector('[data-section="long-headlines"]');
+        adTypeSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'static') {
+                longHeadlinesSection.style.display = 'none';
+                longHeadlinesSection.querySelectorAll('textarea').forEach(ta => ta.removeAttribute('required'));
+            } else {
+                longHeadlinesSection.style.display = 'block';
+                longHeadlinesSection.querySelector('[name="lh0"]').setAttribute('required', '');
+            }
+        });
+
         modal.querySelector('.generate-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const form = e.target;
                 try {
                         const payload = collectGenerateForm(form);
-                        const scriptText = buildGeneratedScript(payload.headlines, payload.longHeadlines, payload.descriptions);
+                        const scriptText = buildGeneratedScript(payload.headlines, payload.longHeadlines, payload.descriptions, payload.adType);
 
                         // show result modal with textarea + actions
                         showGeneratedResult(scriptText, payload.presetTitle || 'Generated preset');
@@ -176,6 +196,11 @@ function createGenerateModal() {
 
 function openGenerateModal() {
     createGenerateModal();
+    const adTypeSelect = _generateModal.querySelector('[name="adType"]');
+    if (adTypeSelect) {
+        adTypeSelect.value = 'video';
+        adTypeSelect.dispatchEvent(new Event('change'));
+    }
     _generateModal.style.display = 'flex';
 }
 
@@ -187,14 +212,15 @@ function closeGenerateModal() {
 function collectGenerateForm(form) {
     const presetTitle = form.presetTitle ? form.presetTitle.value.trim() : '';
     if (!presetTitle) throw new Error('Title обязателен');
+    const adType = form.adType.value;
 
-    function collect(prefix, count, min, max) {
+    function collect(prefix, count, min, max, isRequired) {
             const out = [];
             for (let i = 0; i < count; i++) {
                 const el = form.querySelector(`[name="${prefix}${i}"]`);
                 if (!el) continue;
                 const val = el.value.trim();
-                if (i === 0 && !val) throw new Error('Первое поле в каждом разделе обязательно');
+                if (i === 0 && !val && isRequired) throw new Error('Первое поле в каждом разделе обязательно');
                 if (val) {
                     if (val.length < min || val.length > max) throw new Error(`Длина значения должна быть от ${min} до ${max} символов`);
                     out.push(val);
@@ -203,14 +229,14 @@ function collectGenerateForm(form) {
             return out;
     }
 
-    const headlines = collect('h', 5, 5, 40);
-    const longHeadlines = collect('lh', 5, 5, 90);
-    const descriptions = collect('d', 5, 5, 90);
+    const headlines = collect('h', 5, 5, 40, true);
+    const longHeadlines = adType === 'video' ? collect('lh', 5, 5, 90, true) : [];
+    const descriptions = collect('d', 5, 5, 90, true);
 
-    return { presetTitle, headlines, longHeadlines, descriptions };
+    return { presetTitle, adType, headlines, longHeadlines, descriptions };
 }
 
-function buildGeneratedScript(headlines, longHeadlines, descriptions) {
+function buildGeneratedScript(headlines, longHeadlines, descriptions, adType) {
         // helper to stringify array entries with proper indentation
         function arrToBlock(arr) {
                 if (!arr || arr.length === 0) return '';
@@ -221,6 +247,156 @@ function buildGeneratedScript(headlines, longHeadlines, descriptions) {
         const LONG_BLOCK = arrToBlock(longHeadlines);
         const DESC_BLOCK = arrToBlock(descriptions);
 
+        if (adType === 'static') {
+            return `(function () {
+    'use strict';
+    const HEADLINES = [
+${HEADLINES_BLOCK ? HEADLINES_BLOCK + '\n' : ''}  ];
+    const DESCRIPTIONS = [
+${DESC_BLOCK ? DESC_BLOCK + '\n' : ''}  ];
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+    function randomDelay(min, max) { return sleep(Math.floor(Math.random() * (max - min + 1)) + min); }
+
+
+    function set(el, val) {
+        if (!el) return;
+        el.focus();
+        el.dispatchEvent(new Event('focus', {bubbles: true}));
+        el.value = val;
+        el.dispatchEvent(new Event('input', {bubbles: true}));
+        el.dispatchEvent(new Event('change', {bubbles: true}));
+        el.blur();
+        el.dispatchEvent(new Event('blur', {bubbles: true}));
+    }
+
+    function findAddButton(debugId, labelText) {
+        let btn = null;
+        // Strategy 0: Direct search inside the specific container
+        const container = document.querySelector('multi-asset-editor[debugid="' + debugId + '"]');
+        if (container) {
+            btn = Array.from(container.querySelectorAll('material-button')).find(b => 
+                (b.textContent.includes(labelText) || b.textContent.includes('add')) && b.offsetWidth > 0
+            );
+            if (btn) return btn;
+        }
+    
+        // Fallback strategies
+        btn = Array.from(document.querySelectorAll('material-button')).find(b =>
+            (b.textContent.trim() === 'add' + labelText || b.textContent.trim() === labelText) && b.offsetWidth > 0
+        );
+        if (!btn) btn = Array.from(document.querySelectorAll('material-button')).find(b =>
+            b.textContent.includes(labelText) && b.querySelector('material-icon') && b.offsetWidth > 0
+        );
+        if (!btn) btn = Array.from(document.querySelectorAll('.add-asset-button')).find(b =>
+            b.textContent.includes(labelText) && b.offsetWidth > 0
+        );
+        return btn;
+    }
+
+    setTimeout(async () => {
+        console.log('\u{1F680} Google Ads Auto-Fill');
+        console.log('');
+
+        // Single image ad
+        try {
+            const vr = Array.from(document.querySelectorAll('material-radio')).find(r =>
+                (r.textContent || '').includes('Single image ad') || (r.textContent || '').includes('Show ads with a single image')
+            );
+            if (vr) { vr.click(); console.log('   \u2705 Single image ad'); await sleep(1000); }
+        } catch(e) {}
+        console.log('');
+
+        // Landing Page Preview
+        try {
+            const cb = Array.from(document.querySelectorAll('material-checkbox')).find(c =>
+                (c.textContent || '').includes('Show a screenshot of your landing page')
+            );
+            if (cb && cb.getAttribute('aria-checked') !== 'false') { 
+                cb.click(); 
+                console.log('   \u2705 Landing Page Preview отключен'); 
+                await sleep(1000); 
+            }
+            else if (!cb) {
+                const lp = document.querySelector('#enhancement-option-LANDING_PAGE_PREVIEW');
+                if (lp && lp.getAttribute('aria-checked') !== 'false') { lp.click(); await sleep(1000); }
+            }
+        } catch(e) {}
+        console.log('');
+
+        // Image Optimization
+        try {
+            const imgOptCb = Array.from(document.querySelectorAll('material-checkbox')).find(c => {
+                const t = (c.textContent || '').toLowerCase();
+                return t.includes('image enhancement') || t.includes('image optimization') || t.includes('asset optimization');
+            });
+            if (imgOptCb && imgOptCb.getAttribute('aria-checked') !== 'false') {
+                imgOptCb.click();
+                console.log('   \u2705 Image Optimization отключен');
+                await sleep(1000);
+            }
+        } catch(e) {}
+        console.log('');
+
+        // Add fields
+        async function addSection(debugId, labelText, needed) {
+            console.log('🔄 Проверка полей: ' + labelText);
+            const inputs = Array.from(document.querySelectorAll('multi-asset-editor[debugid="' + debugId + '"] input.input-area')).filter(el => el.offsetWidth > 0);
+            const clicks = needed - inputs.length;
+            if (clicks > 0) {
+                const btn = findAddButton(debugId, labelText);
+                if (btn) {
+                    console.log('   ➕ Добавляем ' + clicks + ' полей (' + labelText + ')');
+                    for (let i = 0; i < clicks; i++) { 
+                        btn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        await sleep(300);
+                        btn.click(); 
+                        await sleep(500); 
+                    }
+                    await sleep(1500); // Дать время Angular отрендерить новые поля
+                } else {
+                    console.log('   ❌ Кнопка "Добавить ' + labelText + '" не найдена!');
+                }
+            }
+        }
+
+        await addSection('headlines', 'Headline', HEADLINES.length);
+        await addSection('descriptions', 'Description', DESCRIPTIONS.length);
+
+        await sleep(1000);
+
+        // Fill Headlines
+        console.log('📝 Заполнение Headlines...');
+        const hi = Array.from(document.querySelectorAll('multi-asset-editor[debugid="headlines"] input.input-area')).filter(el => el.offsetWidth > 0);
+        for (let i = 0; i < Math.min(HEADLINES.length, hi.length); i++) {
+            set(hi[i], HEADLINES[i]);
+            console.log('   \u2705 H' + (i+1) + ': ' + HEADLINES[i]);
+            await randomDelay(300, 600);
+        }
+
+        // Fill Descriptions
+        console.log('📝 Заполнение Descriptions...');
+        const di = Array.from(document.querySelectorAll('multi-asset-editor[debugid="descriptions"] input.input-area')).filter(el => el.offsetWidth > 0);
+        for (let i = 0; i < Math.min(DESCRIPTIONS.length, di.length); i++) {
+            set(di[i], DESCRIPTIONS[i]);
+            console.log('   \u2705 D' + (i+1) + ': ' + DESCRIPTIONS[i]);
+            await randomDelay(300, 600);
+        }
+
+        // Final URL
+        const urlEl = document.querySelector('url-input[debugid="final-url"] input.input-area');
+
+        // Business Name (auto from URL)
+        const compEl = document.querySelector('material-input[debugid="business-name"] input');
+
+        console.log('');
+        console.log('\u{1F389} Заполнение завершено!');
+    }, 100);
+
+})();`;
+        }
+
+        // Default 'video' type
         const tpl = `(function () {
     'use strict';
     const HEADLINES = [
@@ -497,7 +673,7 @@ async function fetchScripts() {
     try {
         const binIds = await fetch('https://json.extendsclass.com/bins', { 
             method: 'GET',
-            headers: { 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' },
+            headers: { 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' },
             cache: 'no-store'
         });
 
@@ -530,7 +706,7 @@ async function addScripts(newScript) {
     try {
         const response = await fetch('https://json.extendsclass.com/bin', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/merge-patch+json', 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' },
+            headers: { 'Content-Type': 'application/merge-patch+json', 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' },
             body: JSON.stringify(newScript)
         });
         
@@ -583,7 +759,7 @@ async function handleUpdateScript(e) {
     
     const updateScriptResult = await fetch(`https://json.extendsclass.com/bin/${id}`, {
         method: 'PUT',
-        headers: { 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' },
+        headers: { 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' },
         body: JSON.stringify(updatedScript)
     });
 
@@ -606,7 +782,7 @@ async function handleDeleteScript() {
 
     const deleteScript = await fetch(`https://json.extendsclass.com/bin/${id}`, {
         method: 'DELETE',
-        headers: { 'Api-Key': '2cd92280-718b-11f1-b6b0-0242ac110005' }
+        headers: { 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' }
     });
     
     state.scripts = state.scripts.filter(s => s.id !== id);
