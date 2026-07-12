@@ -1,17 +1,8 @@
 {
-  "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "api/scripts.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "static/**/*",
-      "use": "@vercel/static"
+      "source": "/api/scripts",
+      "destination": "/api/scripts.js"
     }
   ]
 }
