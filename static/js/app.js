@@ -666,37 +666,20 @@ function bindEvents() {
 }
 
 // ==========================================================================
-// Cloud API Handlers (async / await ExtendsClass Bin CRUD)
+// Cloud API Handlers (async / await Server Backend Bin CRUD)
 // ==========================================================================
 
 async function fetchScripts() {
     try {
-        const binIds = await fetch('https://json.extendsclass.com/bins', { 
+        const response = await fetch('/api/scripts', { 
             method: 'GET',
-            headers: { 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' },
             cache: 'no-store'
         });
 
-        const binIdsData = await binIds.json();
-        console.log('Fetched bin IDs:', binIdsData);
-
-        const scripts = [];
-
-        if (binIdsData && Array.isArray(binIdsData) && binIdsData.length > 0) {
-            await Promise.all(binIdsData.map(async (bin) => {
-                const script = await fetch(`https://json.extendsclass.com/bin/${bin}`, {
-                    method: 'GET',
-                    cache: 'no-store'
-                });
-                const scriptData = await script.json();
-                scriptData.id = bin; // Assign the bin ID to the script data
-                scripts.push(scriptData);
-            }));
-
-            console.log(scripts, '= scripts =');
-            state.scripts = scripts || [];
-            render();
-        }
+        if (!response.ok) throw new Error('Не удалось загрузить скрипты с сервера');
+        const data = await response.json();
+        state.scripts = data || [];
+        render();
     } catch (error) {
         showToast(error.message, 'error');
     }
@@ -704,15 +687,16 @@ async function fetchScripts() {
 
 async function addScripts(newScript) {
     try {
-        const response = await fetch('https://json.extendsclass.com/bin', {
+        const response = await fetch('/api/scripts', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/merge-patch+json', 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(newScript)
         });
         
-        if (!response.ok) throw new Error('Не удалось сохранить изменения в облаке');
+        if (!response.ok) throw new Error('Не удалось сохранить изменения на сервере');
         const responseData = await response.json();
         newScript.id = responseData.id;
+        newScript.created_at = responseData.created_at || newScript.created_at;
         state.scripts.unshift(newScript);
         render();
         return true;
@@ -738,7 +722,7 @@ async function handleAddScript(e) {
     if (success) {
         // Reset Inputs
         dom.scriptForm.reset();
-        showToast('Скрипт успешно добавлен в облачное хранилище', 'success');
+        showToast('Скрипт успешно добавлен в хранилище', 'success');
     }
 }
 
@@ -751,46 +735,48 @@ async function handleUpdateScript(e) {
     
     const updatedScript = {
         name,
-        content,
-        updated_at: new Date().toISOString(),
-        id
+        content
     };
 
-    
-    const updateScriptResult = await fetch(`https://json.extendsclass.com/bin/${id}`, {
-        method: 'PUT',
-        headers: { 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' },
-        body: JSON.stringify(updatedScript)
-    });
+    try {
+        const response = await fetch(`/api/scripts?id=${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedScript)
+        });
 
+        if (!response.ok) throw new Error('Не удалось обновить скрипт на сервере');
+        const responseData = await response.json();
 
-    if (updateScriptResult) {
-        state.scripts = state.scripts.filter(s => s.id !== id);
-        state.scripts.unshift(updatedScript);
+        state.scripts = state.scripts.map(s => s.id == id ? responseData : s);
         render();
         closeModal();
-        showToast('Скрипт сохранен в облаке', 'success');
+        showToast('Скрипт сохранен на сервере', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 
 async function handleDeleteScript() {
-    const id = dom.editScriptId.value
+    const id = dom.editScriptId.value;
 
     if (!confirm('Вы уверены, что хотите окончательно удалить этот скрипт?')) {
         return;
     }
 
-    const deleteScript = await fetch(`https://json.extendsclass.com/bin/${id}`, {
-        method: 'DELETE',
-        headers: { 'Api-Key': '86570942-75f6-11f1-b6b0-0242ac110005' }
-    });
-    
-    state.scripts = state.scripts.filter(s => s.id !== id);
-    render();
+    try {
+        const response = await fetch(`/api/scripts?id=${id}`, {
+            method: 'DELETE'
+        });
 
-    if (deleteScript.ok) {
+        if (!response.ok) throw new Error('Не удалось удалить скрипт с сервера');
+        
+        state.scripts = state.scripts.filter(s => s.id != id);
+        render();
         closeModal();
-        showToast('Скрипт удален из облака', 'info');
+        showToast('Скрипт успешно удален', 'info');
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 

@@ -1,0 +1,13 @@
+{
+  "name": "scriptvault-vercel",
+  "version": "1.0.0",
+  "description": "Server-backed ScriptVault on Vercel",
+  "dependencies": {
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  }
+}
