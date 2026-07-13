@@ -798,7 +798,7 @@ async function handleAddScript(e) {
     
     const newScript = {
         name,
-        content: `// Type: note\n${content}`,
+        content,
         created_at: new Date().toISOString()
     };
     
@@ -808,9 +808,11 @@ async function handleAddScript(e) {
         dom.scriptForm.reset();
         
         // Collapse the manual form
+        const formCard = document.getElementById('form-card');
         const formBody = document.getElementById('script-form');
         const toggleIcon = document.getElementById('form-toggle-icon');
-        if (formBody && toggleIcon) {
+        if (formCard && formBody && toggleIcon) {
+            formCard.style.height = '75px';
             formBody.style.display = 'none';
             toggleIcon.className = 'fa-solid fa-square-minus header-glow-icon';
         }
@@ -824,11 +826,54 @@ async function handleUpdateScript(e) {
     
     const id = dom.editScriptId.value;
     const name = dom.editScriptName.value.trim();
-    const content = dom.editScriptContent.value;
+    
+    const originalScript = state.scripts.find(s => s.id == id);
+    const type = originalScript ? getScriptType(originalScript.content) : 'note';
+    
+    let finalContent = '';
+    if (type === 'static' || type === 'video') {
+        const container = document.getElementById('dynamic-edit-container');
+        if (!container) throw new Error('Structured editor container not found');
+        
+        const headlines = Array.from(container.querySelectorAll('.edit-headline-input'))
+                               .map(ta => ta.value.trim())
+                               .filter(Boolean);
+        const longHeadlines = Array.from(container.querySelectorAll('.edit-long-input'))
+                                   .map(ta => ta.value.trim())
+                                   .filter(Boolean);
+        const descriptions = Array.from(container.querySelectorAll('.edit-desc-input'))
+                                  .map(ta => ta.value.trim())
+                                  .filter(Boolean);
+        
+        // Client side validation before submit
+        let hasValidationError = false;
+        container.querySelectorAll('textarea').forEach(ta => {
+            const val = ta.value;
+            const min = parseInt(ta.getAttribute('data-min'));
+            const max = parseInt(ta.getAttribute('data-max'));
+            const isRequired = ta.hasAttribute('required');
+            const len = val.length;
+            
+            if (len > 0) {
+                if (len < min || len > max) hasValidationError = true;
+            } else if (isRequired) {
+                hasValidationError = true;
+            }
+        });
+        
+        if (hasValidationError) {
+            showToast('Пожалуйста, исправьте ошибки валидации в полях ввода', 'error');
+            return;
+        }
+
+        finalContent = buildGeneratedScript(headlines, longHeadlines, descriptions, type);
+    } else {
+        finalContent = dom.editScriptContent.value;
+    }
     
     const updatedScript = {
         name,
-        content
+        content: finalContent
     };
 
     try {
@@ -899,19 +944,84 @@ async function copyToClipboard(text) {
 // Rendering Engine
 // ==========================================================================
 
+function parseScriptArrays(content) {
+    const headlines = [];
+    const longHeadlines = [];
+    const descriptions = [];
+
+    const headlinesMatch = content.match(/const HEADLINES = \[\s*([\s\S]*?)\s*\];/);
+    if (headlinesMatch) {
+        const raw = headlinesMatch[1];
+        const matches = raw.match(/"[\s\S]*?"|'[\s\S]*?'/g);
+        if (matches) {
+            matches.forEach(m => {
+                try {
+                    headlines.push(JSON.parse(m.replace(/'/g, '"')));
+                } catch (e) {
+                    headlines.push(m.slice(1, -1));
+                }
+            });
+        }
+    }
+
+    const longMatch = content.match(/const LONG_HEADLINES = \[\s*([\s\S]*?)\s*\];/);
+    if (longMatch) {
+        const raw = longMatch[1];
+        const matches = raw.match(/"[\s\S]*?"|'[\s\S]*?'/g);
+        if (matches) {
+            matches.forEach(m => {
+                try {
+                    longHeadlines.push(JSON.parse(m.replace(/'/g, '"')));
+                } catch (e) {
+                    longHeadlines.push(m.slice(1, -1));
+                }
+            });
+        }
+    }
+
+    const descMatch = content.match(/const DESCRIPTIONS = \[\s*([\s\S]*?)\s*\];/);
+    if (descMatch) {
+        const raw = descMatch[1];
+        const matches = raw.match(/"[\s\S]*?"|'[\s\S]*?'/g);
+        if (matches) {
+            matches.forEach(m => {
+                try {
+                    descriptions.push(JSON.parse(m.replace(/'/g, '"')));
+                } catch (e) {
+                    descriptions.push(m.slice(1, -1));
+                }
+            });
+        }
+    }
+
+    return { headlines, longHeadlines, descriptions };
+}
+
 function getScriptType(content) {
     if (!content) return 'note';
-    if (content.includes('// Type: note') || !content.includes('Google Ads Auto-Fill')) {
-        return 'note';
-    }
-    if (content.includes('Single image ad') || !content.includes('LONG_HEADLINES')) {
+    
+    const hasHeadlines = content.includes('const HEADLINES =');
+    const hasDescriptions = content.includes('const DESCRIPTIONS =');
+    const hasSingleImage = content.includes('Single image ad');
+    const hasVideoAd = content.includes('Video ad') || content.includes('Video Ad') || content.includes('Show ads with a single video');
+    const hasLongHeadlines = content.includes('const LONG_HEADLINES =') || content.includes('LONG_HEADLINES');
+
+    if (hasSingleImage && !hasLongHeadlines) {
         return 'static';
     }
-    return 'video';
+    if (hasVideoAd && hasLongHeadlines) {
+        return 'video';
+    }
+    if (!hasHeadlines && !hasDescriptions && !hasSingleImage && !hasVideoAd) {
+        return 'note';
+    }
+    
+    if (hasLongHeadlines) return 'video';
+    if (hasHeadlines || hasDescriptions) return 'static';
+    return 'note';
 }
 
 function render() {
-    console.log(state, '= state =');
     let filtered = [...state.scripts];
     
     // Search Query Matching
@@ -951,15 +1061,16 @@ function render() {
                 card.classList.add('note-card');
             }
             
-            // Format first few lines of script as code block preview (strip note header)
-            let displayContent = script.content;
-            if (displayContent.startsWith('// Type: note\n')) {
-                displayContent = displayContent.substring('// Type: note\n'.length);
+            // Format card code block preview (only show headlines list for static/video)
+            let previewText = '';
+            if (type === 'static' || type === 'video') {
+                const parsed = parseScriptArrays(script.content);
+                const items = parsed.headlines;
+                previewText = items.slice(0, 5).join('\n') + (items.length > 5 ? '\n...' : '');
+            } else {
+                const lines = script.content.split('\n');
+                previewText = lines.slice(0, 5).join('\n') + (lines.length > 5 ? '\n...' : '');
             }
-            const lines = displayContent.split('\n');
-            const previewLines = lines.slice(0, 5).join('\n');
-            const hasMore = lines.length > 5;
-            const previewText = previewLines + (hasMore ? '\n...' : '');
             
             let labelColor = 'var(--clr-primary)';
             if (type === 'static') labelColor = 'var(--clr-cyan)';
@@ -1022,7 +1133,153 @@ function openDetailsModal(script) {
     console.log(script, '= openDetailsModal script =');
     dom.editScriptId.value = script.id;
     dom.editScriptName.value = script.name;
-    dom.editScriptContent.value = script.content;
+    
+    const type = getScriptType(script.content);
+    const contentGroup = document.getElementById('edit-script-content-group');
+    const contentLabel = document.getElementById('edit-content-label');
+    const textareaWrapper = document.getElementById('edit-textarea-wrapper');
+    const dynamicContainer = document.getElementById('dynamic-edit-container');
+    
+    if (type === 'static' || type === 'video') {
+        // Hide raw editor
+        contentLabel.style.display = 'none';
+        textareaWrapper.style.display = 'none';
+        dom.editScriptContent.removeAttribute('required');
+        
+        // Show structured editor
+        dynamicContainer.style.display = 'block';
+        const parsed = parseScriptArrays(script.content);
+        
+        let headlinesHTML = '';
+        for (let i = 0; i < 5; i++) {
+            const val = parsed.headlines[i] || '';
+            headlinesHTML += `
+                <div class="textarea-wrap" style="margin-bottom: 8px;">
+                    <textarea class="edit-headline-input" data-index="${i}" data-min="5" data-max="40" placeholder="Headline ${i+1}" ${i === 0 ? 'required' : ''}>${escapeHTML(val)}</textarea>
+                    <span class="char-count">0</span>
+                </div>
+            `;
+        }
+        
+        let longHTML = '';
+        if (type === 'video') {
+            longHTML = `
+                <div class="section-edit" style="margin-top: 15px;">
+                    <h4 style="margin-bottom: 8px; color: #bfc5ce;">Long Headlines <span style="font-size:12px; color:#aaa; font-weight:500;">(от 5 до 90 символов)</span></h4>
+            `;
+            for (let i = 0; i < 5; i++) {
+                const val = parsed.longHeadlines[i] || '';
+                longHTML += `
+                    <div class="textarea-wrap" style="margin-bottom: 8px;">
+                        <textarea class="edit-long-input" data-index="${i}" data-min="5" data-max="90" placeholder="Long Headline ${i+1}" ${i === 0 ? 'required' : ''}>${escapeHTML(val)}</textarea>
+                        <span class="char-count">0</span>
+                    </div>
+                `;
+            }
+            longHTML += `</div>`;
+        }
+        
+        let descHTML = '';
+        for (let i = 0; i < 5; i++) {
+            const val = parsed.descriptions[i] || '';
+            descHTML += `
+                <div class="textarea-wrap" style="margin-bottom: 8px;">
+                    <textarea class="edit-desc-input" data-index="${i}" data-min="5" data-max="90" placeholder="Description ${i+1}" ${i === 0 ? 'required' : ''}>${escapeHTML(val)}</textarea>
+                    <span class="char-count">0</span>
+                </div>
+            `;
+        }
+        
+        dynamicContainer.innerHTML = `
+            <div class="section-edit">
+                <h4 style="margin-bottom: 8px; color: #bfc5ce;">Headlines <span style="font-size:12px; color:#aaa; font-weight:500;">(от 5 до 40 символов)</span></h4>
+                ${headlinesHTML}
+            </div>
+            ${longHTML}
+            <div class="section-edit" style="margin-top: 15px;">
+                <h4 style="margin-bottom: 8px; color: #bfc5ce;">Descriptions <span style="font-size:12px; color:#aaa; font-weight:500;">(от 5 до 90 символов)</span></h4>
+                ${descHTML}
+            </div>
+        `;
+        
+        // Remove previous listeners if any and add fresh ones
+        const newContainer = dynamicContainer.cloneNode(true);
+        dynamicContainer.parentNode.replaceChild(newContainer, dynamicContainer);
+        
+        const updateEditCounters = () => {
+            newContainer.querySelectorAll('textarea').forEach(ta => {
+                const val = ta.value;
+                const min = parseInt(ta.getAttribute('data-min'));
+                const max = parseInt(ta.getAttribute('data-max'));
+                const isRequired = ta.hasAttribute('required');
+                const counter = ta.parentNode.querySelector('.char-count');
+                if (!counter) return;
+
+                const len = val.length;
+                counter.textContent = len;
+
+                let isInvalid = false;
+                if (len > 0) {
+                    if (len < min || len > max) {
+                        isInvalid = true;
+                    }
+                } else if (isRequired) {
+                    isInvalid = true;
+                }
+
+                if (isInvalid) {
+                    counter.style.color = '#f43f5e';
+                    ta.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+                    ta.style.boxShadow = '0 0 10px rgba(244, 63, 94, 0.15)';
+                } else {
+                    counter.style.color = len > 0 ? '#10b981' : 'rgba(255, 255, 255, 0.4)';
+                    ta.style.borderColor = len > 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)';
+                    ta.style.boxShadow = 'none';
+                }
+            });
+        };
+        
+        newContainer.addEventListener('input', (e) => {
+            if (e.target.tagName === 'TEXTAREA') {
+                updateEditCounters();
+            }
+        });
+        
+        newContainer.addEventListener('paste', (e) => {
+            const target = e.target;
+            if (target.tagName === 'TEXTAREA') {
+                const wrapper = target.closest('.section-edit');
+                const textareas = Array.from(wrapper.querySelectorAll('textarea'));
+                if (target === textareas[0]) {
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    const lines = pastedText.split(/\r?\n/)
+                                            .map(line => line.trim())
+                                            .filter(line => line.length > 0);
+                    if (lines.length > 1) {
+                        e.preventDefault();
+                        lines.forEach((line, index) => {
+                            if (textareas[index]) {
+                                textareas[index].value = line;
+                                textareas[index].dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        });
+                        setTimeout(updateEditCounters, 10);
+                    }
+                }
+            }
+        });
+        
+        setTimeout(updateEditCounters, 50);
+    } else {
+        // Show raw editor for note
+        contentLabel.style.display = 'block';
+        contentLabel.textContent = 'Заметка';
+        textareaWrapper.style.display = 'block';
+        dom.editScriptContent.setAttribute('required', '');
+        dynamicContainer.style.display = 'none';
+        dynamicContainer.innerHTML = '';
+        dom.editScriptContent.value = script.content;
+    }
     
     dom.detailsModal.classList.add('active');
     dom.detailsModal.style.display = 'flex';
