@@ -73,27 +73,27 @@
                 </div>
 
                 <!-- Add Script Form -->
-                <div class="glass-card form-card">
-                    <div class="card-header">
-                        <h3><i class="fa-solid fa-square-plus header-glow-icon"></i> &nbsp;&nbsp;Добавить свой Скрипт</h3>
+                <div class="glass-card form-card" id="form-card">
+                    <div class="card-header" id="form-card-header" style="cursor: pointer; user-select: none;">
+                        <h3><i class="fa-solid fa-square-minus header-glow-icon" id="form-toggle-icon"></i> &nbsp;&nbsp;Добавить заметку</h3>
                     </div>
-                    <form id="script-form">
+                    <form id="script-form" style="display: none;">
                         <div class="form-group">
-                            <label for="script-name-input">Имя скрипта</label>
+                            <label for="script-name-input">Имя заметки</label>
                             <div class="input-wrapper">
-                                <input type="text" id="script-name-input" placeholder="Например: BG Parazit" required autocomplete="off">
+                                <input type="text" id="script-name-input" required autocomplete="off">
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label for="script-content-input">Скрипт</label>
+                            <label for="script-content-input">Заметка</label>
                             <div class="textarea-wrapper">
-                                <textarea id="script-content-input" placeholder="Вставьте код или скрипт сюда..." required rows="8" spellcheck="false"></textarea>
+                                <textarea id="script-content-input" required rows="8" spellcheck="false"></textarea>
                             </div>
                         </div>
 
                         <button type="submit" class="submit-btn" id="add-script-btn">
-                            <span>Добавить Скрипт</span>
+                            <span>Добавить заметку</span>
                             <i class="fa-solid fa-arrow-right-to-bracket"></i>
                         </button>
                     </form>
@@ -113,6 +113,7 @@
                             <button class="filter-btn active" data-filter="all">Все</button>
                             <button class="filter-btn" data-filter="video">Видео</button>
                             <button class="filter-btn" data-filter="static">Статика</button>
+                            <button class="filter-btn" data-filter="note">Заметки</button>
                         </div>
                     </div>
                     <span class="badge" id="badge-total">0</span>

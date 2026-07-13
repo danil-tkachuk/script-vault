@@ -329,6 +329,7 @@ a {
 /* Add Script Form */
 .form-card {
     padding: 1.75rem;
+    height: 75px; /* Collapsed height */
 }
 
 .card-header {
@@ -339,7 +340,7 @@ a {
 }
 
 .card-header h3 {
-    font-size: 1.15rem;
+    font-size: 16px;
     font-weight: 600;
 }
 
@@ -989,4 +990,14 @@ textarea {
     padding: 2px 6px;
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* --- Note Script Card Theme --- */
+.script-card.note-card::before {
+    background: linear-gradient(to bottom, var(--clr-rose), #fb7185);
+}
+
+.script-card.note-card:hover {
+    border-color: rgba(244, 63, 94, 0.3);
+    box-shadow: 0 0 20px rgba(244, 63, 94, 0.25), 0 10px 30px rgba(0, 0, 0, 0.35);
 }

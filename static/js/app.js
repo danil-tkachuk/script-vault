@@ -712,6 +712,27 @@ function bindEvents() {
         if (e.target === dom.detailsModal) closeModal();
     });
 
+    // Collapse/expand toggle for Add Note Form
+    const formCard = document.getElementById('form-card');
+    const formHeader = document.getElementById('form-card-header');
+    const formBody = document.getElementById('script-form');
+    const toggleIcon = document.getElementById('form-toggle-icon');
+    
+    if (formCard && formHeader && formBody && toggleIcon) {
+        formHeader.addEventListener('click', () => {
+            const isCollapsed = formBody.style.display === 'none';
+            if (isCollapsed) {
+                formCard.style.height = 'auto';
+                formBody.style.display = 'block';
+                toggleIcon.className = 'fa-solid fa-square-plus header-glow-icon';
+            } else {
+                formCard.style.height = '75px';
+                formBody.style.display = 'none';
+                toggleIcon.className = 'fa-solid fa-square-minus header-glow-icon';
+            }
+        });
+    }
+
     // Script list filters
     const filterGroup = document.getElementById('script-filter-group');
     if (filterGroup) {
@@ -777,7 +798,7 @@ async function handleAddScript(e) {
     
     const newScript = {
         name,
-        content,
+        content: `// Type: note\n${content}`,
         created_at: new Date().toISOString()
     };
     
@@ -785,7 +806,16 @@ async function handleAddScript(e) {
     if (success) {
         // Reset Inputs
         dom.scriptForm.reset();
-        showToast('Скрипт успешно добавлен в хранилище', 'success');
+        
+        // Collapse the manual form
+        const formBody = document.getElementById('script-form');
+        const toggleIcon = document.getElementById('form-toggle-icon');
+        if (formBody && toggleIcon) {
+            formBody.style.display = 'none';
+            toggleIcon.className = 'fa-solid fa-square-minus header-glow-icon';
+        }
+        
+        showToast('Заметка успешно добавлена', 'success');
     }
 }
 
@@ -870,7 +900,10 @@ async function copyToClipboard(text) {
 // ==========================================================================
 
 function getScriptType(content) {
-    if (!content) return 'video';
+    if (!content) return 'note';
+    if (content.includes('// Type: note') || !content.includes('Google Ads Auto-Fill')) {
+        return 'note';
+    }
     if (content.includes('Single image ad') || !content.includes('LONG_HEADLINES')) {
         return 'static';
     }
@@ -914,18 +947,28 @@ function render() {
             card.className = 'script-card glass-card';
             if (type === 'static') {
                 card.classList.add('static-card');
+            } else if (type === 'note') {
+                card.classList.add('note-card');
             }
             
-            // Format first few lines of script as code block preview
-            const lines = script.content.split('\n');
+            // Format first few lines of script as code block preview (strip note header)
+            let displayContent = script.content;
+            if (displayContent.startsWith('// Type: note\n')) {
+                displayContent = displayContent.substring('// Type: note\n'.length);
+            }
+            const lines = displayContent.split('\n');
             const previewLines = lines.slice(0, 5).join('\n');
             const hasMore = lines.length > 5;
             const previewText = previewLines + (hasMore ? '\n...' : '');
             
+            let labelColor = 'var(--clr-primary)';
+            if (type === 'static') labelColor = 'var(--clr-cyan)';
+            else if (type === 'note') labelColor = 'var(--clr-rose)';
+            
             card.innerHTML = `
                 <div class="script-card-header">
                     <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
-                        <span class="script-type-label" style="font-size: 10px; text-transform: uppercase; color: ${type === 'static' ? 'var(--clr-cyan)' : 'var(--clr-primary)'}; font-weight: 700; margin-bottom: 2px; letter-spacing: 0.5px;">${type}</span>
+                        <span class="script-type-label" style="font-size: 10px; text-transform: uppercase; color: ${labelColor}; font-weight: 700; margin-bottom: 2px; letter-spacing: 0.5px;">${type}</span>
                         <span class="script-card-title" title="${escapeHTML(script.name)}" style="width: 100%;">${escapeHTML(script.name)}</span>
                     </div>
                     <span class="copy-indicator">Клик: Копировать</span>
