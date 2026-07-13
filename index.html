@@ -142,9 +142,12 @@
     <!-- Script Details / Edit Modal -->
     <div class="modal-overlay" id="details-modal" style="display: none;">
         <div class="modal-content glass-card">
-            <div class="modal-header">
-                <h3><i class="fa-solid fa-pen-to-square"></i> Детали Скрипта</h3>
-                <button class="close-modal-btn" id="close-modal-btn">
+            <div class="modal-header" style="display: flex; align-items: center; gap: 15px;">
+                <h3 style="margin: 0;"><i class="fa-solid fa-pen-to-square"></i> Детали Скрипта</h3>
+                <button type="button" class="btn-primary" id="copy-details-text-btn" style="margin-left: auto; padding: 6px 14px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; border-radius: 8px;">
+                    <i class="fa-solid fa-copy"></i> Скопировать текст
+                </button>
+                <button type="button" class="close-modal-btn" id="close-modal-btn" style="margin-left: 0;">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>

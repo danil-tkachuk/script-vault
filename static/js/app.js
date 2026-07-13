@@ -38,6 +38,7 @@ const dom = {
     cancelEditBtn: document.getElementById('cancel-edit-btn'),
     deleteScriptBtn: document.getElementById('delete-script-btn'),
     generateScriptBtn: document.getElementById('generate-script-btn'),
+    copyDetailsTextBtn: document.getElementById('copy-details-text-btn'),
     
     // Toast Container
     toastContainer: document.getElementById('toast-container')
@@ -706,6 +707,43 @@ function bindEvents() {
     dom.cancelEditBtn.addEventListener('click', closeModal);
     dom.editScriptForm.addEventListener('submit', handleUpdateScript);
     dom.deleteScriptBtn.addEventListener('click', handleDeleteScript);
+    
+    // Copy plain text inside details modal
+    dom.copyDetailsTextBtn.addEventListener('click', () => {
+        const id = dom.editScriptId.value;
+        const originalScript = state.scripts.find(s => s.id == id);
+        const type = originalScript ? getScriptType(originalScript.content) : 'note';
+        
+        let text = '';
+        if (type === 'static' || type === 'video') {
+            const container = document.getElementById('dynamic-edit-container');
+            if (container) {
+                const headlines = Array.from(container.querySelectorAll('.edit-headline-input'))
+                                       .map(ta => ta.value.trim())
+                                       .filter(Boolean);
+                const longHeadlines = Array.from(container.querySelectorAll('.edit-long-input'))
+                                           .map(ta => ta.value.trim())
+                                           .filter(Boolean);
+                const descriptions = Array.from(container.querySelectorAll('.edit-desc-input'))
+                                          .map(ta => ta.value.trim())
+                                          .filter(Boolean);
+                
+                if (type === 'static') {
+                    text = [headlines.join('\n'), descriptions.join('\n')].join('\n\n');
+                } else {
+                    text = [headlines.join('\n'), longHeadlines.join('\n'), descriptions.join('\n')].join('\n\n');
+                }
+            }
+        } else {
+            text = dom.editScriptContent.value;
+        }
+        
+        if (text) {
+            copyToClipboard(text);
+        } else {
+            showToast('Нет текста для копирования', 'error');
+        }
+    });
     
     // Close modal on background overlay click
     dom.detailsModal.addEventListener('click', (e) => {
