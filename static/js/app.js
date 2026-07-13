@@ -5,7 +5,8 @@
 // Application State
 const state = {
     scripts: [],
-    searchQuery: ''
+    searchQuery: '',
+    filterType: 'all'
 };
 
 // DOM Cache
@@ -77,17 +78,17 @@ function createGenerateModal() {
 
                 <div class="section" data-section="headlines">
                     <h4>Headlines <span>(от 5 до 40 символов)</span></h4>
-                    ${new Array(5).fill(0).map((_,i)=> `<textarea name="h${i}" data-min="5" data-max="40" placeholder="Headline ${i+1}" ${i===0? 'required': ''}></textarea>`).join('')}
+                    ${new Array(5).fill(0).map((_,i)=> `<div class="textarea-wrap"><textarea name="h${i}" data-min="5" data-max="40" placeholder="Headline ${i+1}" ${i===0? 'required': ''}></textarea><span class="char-count">0</span></div>`).join('')}
                 </div>
 
                 <div class="section" data-section="long-headlines">
                     <h4>Long Headlines <span>(от 5 до 90 символов)</span></h4>
-                    ${new Array(5).fill(0).map((_,i)=> `<textarea name="lh${i}" data-min="5" data-max="90" placeholder="Long Headline ${i+1}" ${i===0? 'required': ''}></textarea>`).join('')}
+                    ${new Array(5).fill(0).map((_,i)=> `<div class="textarea-wrap"><textarea name="lh${i}" data-min="5" data-max="90" placeholder="Long Headline ${i+1}" ${i===0? 'required': ''}></textarea><span class="char-count">0</span></div>`).join('')}
                 </div>
 
                 <div class="section" data-section="descriptions">
                     <h4>Descriptions <span>(от 5 до 90 символов)</span></h4>
-                    ${new Array(5).fill(0).map((_,i)=> `<textarea name="d${i}" data-min="5" data-max="90" placeholder="Description ${i+1}" ${i===0? 'required': ''}></textarea>`).join('')}
+                    ${new Array(5).fill(0).map((_,i)=> `<div class="textarea-wrap"><textarea name="d${i}" data-min="5" data-max="90" placeholder="Description ${i+1}" ${i===0? 'required': ''}></textarea><span class="char-count">0</span></div>`).join('')}
                 </div>
 
                 <footer class="modal-actions">
@@ -97,40 +98,63 @@ function createGenerateModal() {
             </form>
         </div>`;
 
-        document.addEventListener('paste', function (e) {
-        const target = e.target;
+        const updateCounters = () => {
+            modal.querySelectorAll('.generate-form textarea').forEach(ta => {
+                const val = ta.value;
+                const min = parseInt(ta.getAttribute('data-min'));
+                const max = parseInt(ta.getAttribute('data-max'));
+                const isRequired = ta.hasAttribute('required');
+                const counter = ta.parentNode.querySelector('.char-count');
+                if (!counter) return;
 
-        // Проверяем, что вставка происходит в textarea внутри блока .section
-        if (target.tagName === 'TEXTAREA' && target.closest('.section')) {
-            const section = target.closest('.section');
+                const len = val.length;
+                counter.textContent = len;
+
+                let isInvalid = false;
+                if (len > 0) {
+                    if (len < min || len > max) {
+                        isInvalid = true;
+                    }
+                } else if (isRequired) {
+                    isInvalid = true;
+                }
+
+                if (isInvalid) {
+                    counter.style.color = '#f43f5e'; // Red/Rose
+                    ta.style.borderColor = 'rgba(244, 63, 94, 0.4)';
+                    ta.style.boxShadow = '0 0 10px rgba(244, 63, 94, 0.15)';
+                } else {
+                    counter.style.color = len > 0 ? '#10b981' : 'rgba(255, 255, 255, 0.4)'; // Emerald if filled, muted if empty
+                    ta.style.borderColor = len > 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.08)';
+                    ta.style.boxShadow = 'none';
+                }
+            });
+        };
+
+        document.addEventListener('paste', function (e) {
+            const target = e.target;
+
+            if (target.tagName === 'TEXTAREA' && target.closest('.section')) {
+                const section = target.closest('.section');
                 const textareas = Array.from(section.querySelectorAll('textarea'));
 
-                // Проверяем, что это именно ПЕРВЫЙ textarea в этой секции (индекс 0)
                 if (target === textareas[0]) {
-                    // Получаем текст из буфера обмена
                     const pastedText = (e.clipboardData || window.clipboardData).getData('text');
                     
-                    // Разбиваем текст по переносам строк, убираем лишние пробелы по краям
-                    // .filter(line => line.trim() !== '') удалит пустые строки (актуально при копировании из ChatGPT/Notion)
                     const lines = pastedText.split(/\r?\n/)
                                             .map(line => line.trim())
                                             .filter(line => line.length > 0);
 
-                    // Если вставили многострочный текст (больше одной строки)
                     if (lines.length > 1) {
-                        // Отменяем стандартное поведение браузера (чтобы весь кусок текста не упал в первое поле)
                         e.preventDefault();
 
-                        // Распределяем строки по textarea в текущей секции
                         lines.forEach((line, index) => {
                             if (textareas[index]) {
                                 textareas[index].value = line;
-                                
-                                // Важно: вызываем событие 'input' вручную.
-                                // Это нужно, если у вас привязаны счетчики символов (data-min/data-max) или валидация.
                                 textareas[index].dispatchEvent(new Event('input', { bubbles: true }));
                             }
                         });
+                        setTimeout(updateCounters, 10);
                     }
                 }
             }
@@ -169,10 +193,20 @@ function createGenerateModal() {
         adTypeSelect.addEventListener('change', (e) => {
             if (e.target.value === 'static') {
                 longHeadlinesSection.style.display = 'none';
-                longHeadlinesSection.querySelectorAll('textarea').forEach(ta => ta.removeAttribute('required'));
+                longHeadlinesSection.querySelectorAll('textarea').forEach(ta => {
+                    ta.removeAttribute('required');
+                });
             } else {
                 longHeadlinesSection.style.display = 'block';
                 longHeadlinesSection.querySelector('[name="lh0"]').setAttribute('required', '');
+            }
+            updateCounters();
+        });
+
+        // Update counters on text input
+        modal.querySelector('.generate-form').addEventListener('input', (e) => {
+            if (e.target.tagName === 'TEXTAREA') {
+                updateCounters();
             }
         });
 
@@ -191,6 +225,7 @@ function createGenerateModal() {
         });
 
         _generateModal = modal;
+        setTimeout(updateCounters, 50);
         return modal;
 }
 
@@ -202,6 +237,19 @@ function openGenerateModal() {
         adTypeSelect.dispatchEvent(new Event('change'));
     }
     _generateModal.style.display = 'flex';
+    const form = _generateModal.querySelector('.generate-form');
+    if (form) {
+        form.reset();
+        _generateModal.querySelectorAll('.char-count').forEach(c => {
+            c.textContent = '0';
+            c.style.color = 'rgba(255, 255, 255, 0.4)';
+        });
+        _generateModal.querySelectorAll('textarea').forEach(ta => {
+            ta.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+            ta.style.boxShadow = 'none';
+        });
+        adTypeSelect.dispatchEvent(new Event('change'));
+    }
 }
 
 function closeGenerateModal() {
@@ -663,6 +711,21 @@ function bindEvents() {
     dom.detailsModal.addEventListener('click', (e) => {
         if (e.target === dom.detailsModal) closeModal();
     });
+
+    // Script list filters
+    const filterGroup = document.getElementById('script-filter-group');
+    if (filterGroup) {
+        filterGroup.addEventListener('click', (e) => {
+            const btn = e.target.closest('.filter-btn');
+            if (!btn) return;
+            
+            filterGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            state.filterType = btn.getAttribute('data-filter');
+            render();
+        });
+    }
 }
 
 // ==========================================================================
@@ -806,6 +869,14 @@ async function copyToClipboard(text) {
 // Rendering Engine
 // ==========================================================================
 
+function getScriptType(content) {
+    if (!content) return 'video';
+    if (content.includes('Single image ad') || !content.includes('LONG_HEADLINES')) {
+        return 'static';
+    }
+    return 'video';
+}
+
 function render() {
     console.log(state, '= state =');
     let filtered = [...state.scripts];
@@ -816,6 +887,11 @@ function render() {
             script.name.toLowerCase().includes(state.searchQuery) ||
             script.content.toLowerCase().includes(state.searchQuery)
         );
+    }
+
+    // Type Filter Matching
+    if (state.filterType && state.filterType !== 'all') {
+        filtered = filtered.filter(script => getScriptType(script.content) === state.filterType);
     }
     
     // Update dashboard counter metrics
@@ -834,7 +910,11 @@ function render() {
         // Render cards
         filtered.forEach(script => {
             const card = document.createElement('div');
+            const type = getScriptType(script.content);
             card.className = 'script-card glass-card';
+            if (type === 'static') {
+                card.classList.add('static-card');
+            }
             
             // Format first few lines of script as code block preview
             const lines = script.content.split('\n');
@@ -844,7 +924,10 @@ function render() {
             
             card.innerHTML = `
                 <div class="script-card-header">
-                    <span class="script-card-title" title="${escapeHTML(script.name)}">${escapeHTML(script.name)}</span>
+                    <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+                        <span class="script-type-label" style="font-size: 10px; text-transform: uppercase; color: ${type === 'static' ? 'var(--clr-cyan)' : 'var(--clr-primary)'}; font-weight: 700; margin-bottom: 2px; letter-spacing: 0.5px;">${type}</span>
+                        <span class="script-card-title" title="${escapeHTML(script.name)}" style="width: 100%;">${escapeHTML(script.name)}</span>
+                    </div>
                     <span class="copy-indicator">Клик: Копировать</span>
                 </div>
                 <div class="script-card-body">${escapeHTML(previewText)}</div>

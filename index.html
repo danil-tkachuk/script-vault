@@ -104,9 +104,16 @@
             <section class="scripts-board">
                 <!-- Board Header -->
                 <div class="board-header glass-card">
-                    <div class="board-title">
-                        <i class="fa-solid fa-cubes"></i>
-                        <h4>Ваши скрипты</h4>
+                    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <div class="board-title">
+                            <i class="fa-solid fa-cubes"></i>
+                            <h4>Ваши скрипты</h4>
+                        </div>
+                        <div class="script-filter-group" id="script-filter-group">
+                            <button class="filter-btn active" data-filter="all">Все</button>
+                            <button class="filter-btn" data-filter="video">Видео</button>
+                            <button class="filter-btn" data-filter="static">Статика</button>
+                        </div>
                     </div>
                     <span class="badge" id="badge-total">0</span>
                 </div>
